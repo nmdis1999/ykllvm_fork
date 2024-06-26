@@ -1392,13 +1392,32 @@ private:
     // bytes:
     OutStreamer.emitSizeT(0);
   }
+  
+ void serialiseConstantFP(ConstantFP *CFP) {
+    OutStreamer.emitInt8(ConstKindVal);
+    OutStreamer.emitSizeT(typeIndex(CFP->getType()));
 
-  void serialiseConstant(Constant *C) {
+    if (CFP->getType()->isFloatTy()) {
+        OutStreamer.emitSizeT(4);
+        float Value = CFP->getValueAPF().convertToFloat();
+        OutStreamer.emitBinaryData({reinterpret_cast<const char*>(&Value), sizeof(float)});
+    } else if (CFP->getType()->isDoubleTy()) {
+        OutStreamer.emitSizeT(8);
+        double Value = CFP->getValueAPF().convertToDouble();
+        OutStreamer.emitBinaryData({reinterpret_cast<const char*>(&Value), sizeof(double)});
+    } else {
+        llvm::report_fatal_error("Unexpected floating-point type");
+    }
+}  
+
+void serialiseConstant(Constant *C) {
     if (ConstantInt *CI = dyn_cast<ConstantInt>(C)) {
       serialiseConstantInt(CI);
     } else if (ConstantPointerNull *NP = dyn_cast<ConstantPointerNull>(C)) {
       serialiseConstantNullPtr(NP);
-    } else {
+    } else if (ConstantFP *CFP = dyn_cast<ConstantFP>(C)) {
+          serialiseConstantFP(CFP);
+    }  else {
       serialiseUnimplementedConstant(C);
     }
   }
